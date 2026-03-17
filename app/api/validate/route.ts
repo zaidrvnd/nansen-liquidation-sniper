@@ -12,7 +12,7 @@ export async function POST(request: Request) {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'apikey': apiKey
       }
     });
 
