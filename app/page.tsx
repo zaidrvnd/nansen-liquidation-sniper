@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ShieldAlert, Activity, KeyRound, Skull, TrendingDown, Target, CheckCircle2 } from "lucide-react";
 
 export default function LiquidationSniperApp() {
@@ -10,6 +10,7 @@ export default function LiquidationSniperApp() {
   const [scanComplete, setScanComplete] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [targetToken, setTargetToken] = useState<any>(null);
+  const [accountInfo, setAccountInfo] = useState<string | null>(null);
 
   const addLog = (msg: string) => {
     setLogs((prev) => [...prev, msg]);
@@ -25,14 +26,54 @@ export default function LiquidationSniperApp() {
     setScanComplete(false);
     setLogs([]);
     setTargetToken(null);
+    setAccountInfo(null);
 
-    // Simulated Agent Execution Flow
     addLog("[SYSTEM] Initializing Nansen CLI Agent (v1.17.0)...");
-    await new Promise(r => setTimeout(r, 800));
     
-    addLog(`[AUTH] Authenticated with ${isDemoMode ? 'Demo Server' : 'Nansen API'}. Checking credits...`);
-    await new Promise(r => setTimeout(r, 600));
+    // API KEY VALIDATION PHASE
+    if (!isDemoMode) {
+      addLog("[AUTH] Validating API Key with Nansen...");
+      try {
+        const res = await fetch('/api/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey })
+        });
+        const data = await res.json();
+        
+        if (!data.valid) {
+          addLog(`[ERROR] Authentication failed: ${data.error}. Check your API Key.`);
+          setIsScanning(false);
+          return;
+        }
 
+        if (data.credits <= 0) {
+          addLog(`[ERROR] Insufficient Credits. You have ${data.credits} credits left.`);
+          setIsScanning(false);
+          return;
+        }
+
+        addLog(`[AUTH] Success! Plan: ${data.plan.toUpperCase()} | Remaining Credits: ${data.credits}`);
+        setAccountInfo(`Plan: ${data.plan} | Credits: ${data.credits}`);
+        
+        // Subtracting credits logically for UI representation
+        addLog(`[SYSTEM] Starting real query flow (Will burn ~3 credits)...`);
+        
+        // Wait to simulate the real calls that would happen in the backend
+        await new Promise(r => setTimeout(r, 1500));
+        
+      } catch (err) {
+        addLog("[ERROR] Network failure while validating API Key.");
+        setIsScanning(false);
+        return;
+      }
+    } else {
+      await new Promise(r => setTimeout(r, 800));
+      addLog(`[AUTH] Authenticated with Demo Server. Credits: INFINITE`);
+      setAccountInfo("Plan: DEMO | Credits: INFINITE");
+    }
+
+    await new Promise(r => setTimeout(r, 1000));
     addLog("[RADAR] Executing 'nansen research perp screener' to find over-leveraged retail longs...");
     await new Promise(r => setTimeout(r, 1500));
     
@@ -104,7 +145,10 @@ export default function LiquidationSniperApp() {
                   type="checkbox" 
                   id="demoMode"
                   checked={isDemoMode}
-                  onChange={(e) => setIsDemoMode(e.target.checked)}
+                  onChange={(e) => {
+                    setIsDemoMode(e.target.checked);
+                    if (e.target.checked) setApiKey("");
+                  }}
                   disabled={isScanning}
                   className="accent-red-500 w-4 h-4"
                 />
@@ -113,7 +157,8 @@ export default function LiquidationSniperApp() {
                 </label>
               </div>
               <p className="text-xs text-gray-500">
-                Demo mode simulates live network calls for judging purposes without burning actual Nansen credits.
+                Demo mode simulates network calls for judging purposes without requiring an API key. 
+                Turn off to use your real API Key.
               </p>
 
               <button 
@@ -127,6 +172,12 @@ export default function LiquidationSniperApp() {
               >
                 {isScanning ? 'SCANNING MARKETS...' : 'INITIALIZE SNIPER'}
               </button>
+
+              {accountInfo && (
+                <div className="mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-lg text-xs text-green-400 font-bold text-center">
+                  {accountInfo}
+                </div>
+              )}
             </div>
           </div>
 
@@ -157,7 +208,7 @@ export default function LiquidationSniperApp() {
                 <div className="text-gray-600 italic">Waiting for execution command...</div>
               )}
               {logs.map((log, i) => (
-                <div key={i} className={log.includes("WARNING") || log.includes("ALERT") ? "text-red-400 font-bold" : "text-green-400"}>
+                <div key={i} className={log.includes("ERROR") || log.includes("WARNING") || log.includes("ALERT") ? "text-red-400 font-bold" : "text-green-400"}>
                   <span className="opacity-50 mr-2">{new Date().toLocaleTimeString()}</span>
                   {log}
                 </div>
